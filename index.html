@@ -197,8 +197,19 @@
 
       function loadDashboardData() {
         document.getElementById("loading").style.display = "block";
-        // Panggil fungsi getData di Code.gs
-        google.script.run.withSuccessHandler(onDataLoaded).getData();
+
+        // Kita ganti google.script.run dengan fetch biasa
+        // Pastikan variabel scriptURL di atas sudah benar berisi URL Google Script App Anda
+        fetch(scriptURL + "?action=getData")
+          .then((response) => response.json())
+          .then((data) => {
+            onDataLoaded(data);
+          })
+          .catch((error) => {
+            console.error("Error:", error);
+            document.getElementById("loading").style.display = "none";
+            alert("Gagal mengambil data. Cek Console.");
+          });
       }
 
       function onDataLoaded(data) {
