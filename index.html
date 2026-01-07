@@ -4,156 +4,316 @@
     <base target="_top" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
       body {
-        background-color: #f8f9fa;
+        background-color: #f0f2f5;
         padding: 20px;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
       }
       .card {
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        border-radius: 10px;
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        margin-bottom: 20px;
       }
-      .form-label {
-        font-weight: 500;
+      .stat-card {
+        transition: transform 0.2s;
       }
-      .margin-display {
-        font-size: 1.2em;
+      .stat-card:hover {
+        transform: translateY(-5px);
+      }
+      .nav-tabs .nav-link.active {
+        background-color: #fff;
+        border-bottom-color: #fff;
         font-weight: bold;
-        color: #198754;
       }
-      .margin-negative {
-        color: #dc3545;
+      .chart-container {
+        position: relative;
+        height: 300px;
+        width: 100%;
+      }
+      .loading-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.8);
+        z-index: 999;
+        text-align: center;
+        padding-top: 200px;
       }
     </style>
   </head>
   <body>
+    <div id="loading" class="loading-overlay">
+      <div class="spinner-border text-primary" role="status"></div>
+      <p>Memuat Data...</p>
+    </div>
+
     <div class="container">
-      <div class="row justify-content-center">
-        <div class="col-md-8 col-lg-6">
-          <div class="card p-4">
-            <h3 class="text-center mb-4">💰 Catatan Jual Beli</h3>
+      <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
+        <li class="nav-item">
+          <button class="nav-link active" id="input-tab" data-bs-toggle="tab" data-bs-target="#input-pane" type="button">📝 Input Transaksi</button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard-pane" type="button" onclick="loadDashboardData()">📊 Dashboard & Grafik</button>
+        </li>
+      </ul>
 
-            <form id="tradingForm">
-              <div class="row mb-3">
-                <div class="col-6">
-                  <label class="form-label">Tanggal Beli</label>
-                  <input type="date" class="form-control" name="tanggalBeli" required />
+      <div class="tab-content" id="myTabContent">
+        <div class="tab-pane fade show active" id="input-pane">
+          <div class="row justify-content-center">
+            <div class="col-md-8">
+              <div class="card p-4">
+                <h4 class="mb-4">Input Data Jual Beli</h4>
+                <form id="tradingForm">
+                  <div class="row mb-3">
+                    <div class="col-6"><label>Tanggal Beli</label><input type="date" class="form-control" name="tanggalBeli" required /></div>
+                    <div class="col-6"><label>Item</label><input type="text" class="form-control" name="item" required /></div>
+                  </div>
+                  <div class="mb-3"><label>Source</label><input type="text" class="form-control" name="source" /></div>
+                  <div class="row mb-3">
+                    <div class="col-4"><label>Harga Beli</label><input type="number" class="form-control calc-trigger" id="hargaBeli" name="hargaBeli" required /></div>
+                    <div class="col-4"><label>Harga Jual</label><input type="number" class="form-control calc-trigger" id="hargaJual" name="hargaJual" required /></div>
+                    <div class="col-4"><label>Admin</label><input type="number" class="form-control calc-trigger" id="admin" name="admin" value="0" /></div>
+                  </div>
+                  <div class="alert alert-light border text-center"><h5 id="marginDisplay" class="text-success m-0">Rp 0</h5></div>
+                  <div class="mb-3"><label>Tanggal Terjual</label><input type="date" class="form-control" name="tanggalTerjual" /></div>
+                  <button type="submit" id="btnSubmit" class="btn btn-primary w-100">Simpan</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="dashboard-pane">
+          <div class="card p-3 mb-3">
+            <div class="row g-2 align-items-end">
+              <div class="col-md-4">
+                <label class="small">Dari Tanggal</label>
+                <input type="date" id="filterStart" class="form-control" />
+              </div>
+              <div class="col-md-4">
+                <label class="small">Sampai Tanggal</label>
+                <input type="date" id="filterEnd" class="form-control" />
+              </div>
+              <div class="col-md-4">
+                <button class="btn btn-outline-primary w-100" onclick="applyFilter()">Terapkan Filter</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="row mb-3">
+            <div class="col-md-4">
+              <div class="card p-3 stat-card bg-primary text-white">
+                <h6>Total Profit (Net)</h6>
+                <h3 id="totalProfit">Rp 0</h3>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card p-3 stat-card bg-success text-white">
+                <h6>Total Omzet (Penjualan)</h6>
+                <h3 id="totalOmzet">Rp 0</h3>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card p-3 stat-card bg-warning text-dark">
+                <h6>Item Terjual</h6>
+                <h3 id="totalItem">0</h3>
+              </div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-8">
+              <div class="card p-3">
+                <h5>Grafik Profit Harian</h5>
+                <div class="chart-container">
+                  <canvas id="profitChart"></canvas>
                 </div>
-                <div class="col-6">
-                  <label class="form-label">Item / Barang</label>
-                  <input type="text" class="form-control" name="item" placeholder="Nama Barang" required />
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card p-3">
+                <h5>Top 5 Item (Profit)</h5>
+                <div class="chart-container">
+                  <canvas id="itemChart"></canvas>
                 </div>
               </div>
-
-              <div class="mb-3">
-                <label class="form-label">Source (Beli dimana)</label>
-                <input type="text" class="form-control" name="source" placeholder="Contoh: Tokopedia, Supplier A" />
-              </div>
-
-              <div class="row mb-3">
-                <div class="col-4">
-                  <label class="form-label">Harga Beli</label>
-                  <input type="number" class="form-control calc-trigger" name="hargaBeli" id="hargaBeli" placeholder="0" required />
-                </div>
-                <div class="col-4">
-                  <label class="form-label">Harga Jual</label>
-                  <input type="number" class="form-control calc-trigger" name="hargaJual" id="hargaJual" placeholder="0" required />
-                </div>
-                <div class="col-4">
-                  <label class="form-label">Admin/Fee</label>
-                  <input type="number" class="form-control calc-trigger" name="admin" id="admin" placeholder="0" value="0" />
-                </div>
-              </div>
-
-              <div class="alert alert-light border text-center mb-3">
-                <small>Estimasi Net Margin:</small><br />
-                <span id="marginDisplay" class="margin-display">Rp 0</span>
-              </div>
-
-              <div class="mb-4">
-                <label class="form-label">Tanggal Terjual</label>
-                <input type="date" class="form-control" name="tanggalTerjual" />
-                <small class="text-muted">*Kosongkan jika belum terjual</small>
-              </div>
-
-              <div class="d-grid gap-2">
-                <button type="submit" id="btnSubmit" class="btn btn-primary btn-lg">Simpan Transaksi</button>
-              </div>
-            </form>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
-      // 1. Script untuk Kalkulasi Margin Otomatis di Tampilan
-      const inputs = document.querySelectorAll(".calc-trigger");
-      const marginDisplay = document.getElementById("marginDisplay");
-
-      inputs.forEach((input) => {
-        input.addEventListener("input", calculateMargin);
-      });
-
-      function calculateMargin() {
-        const beli = parseFloat(document.getElementById("hargaBeli").value) || 0;
-        const jual = parseFloat(document.getElementById("hargaJual").value) || 0;
-        const admin = parseFloat(document.getElementById("admin").value) || 0;
-
-        const margin = jual - (beli + admin);
-
-        // Format Rupiah
-        marginDisplay.innerText = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(margin);
-
-        // Ubah warna jika minus
-        if (margin < 0) {
-          marginDisplay.classList.add("margin-negative");
-        } else {
-          marginDisplay.classList.remove("margin-negative");
-        }
-      }
-
-      // 2. Script Pengiriman Data ke Google Sheet
-      const form = document.getElementById("tradingForm");
-
-      // !!! GANTI URL INI DENGAN URL DEPLOYMENT ANDA !!!
+      // --- KONFIGURASI ---
+      // GANTI DENGAN URL DEPLOY ANDA
       const scriptURL = "https://script.google.com/macros/s/AKfycbzrHvS3gYlGYNre63RN5Z2umoQ4_B2h3D_TaRBINkM26qx7qG69hI8awRzlRCEr64HI/exec";
 
-      form.addEventListener("submit", (e) => {
+      // --- LOGIKA INPUT (Sama seperti sebelumnya) ---
+      const inputs = document.querySelectorAll(".calc-trigger");
+      inputs.forEach((i) =>
+        i.addEventListener("input", () => {
+          const b = parseFloat(document.getElementById("hargaBeli").value) || 0;
+          const j = parseFloat(document.getElementById("hargaJual").value) || 0;
+          const a = parseFloat(document.getElementById("admin").value) || 0;
+          const m = j - (b + a);
+          const disp = document.getElementById("marginDisplay");
+          disp.innerText = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(m);
+          disp.className = m < 0 ? "text-danger m-0" : "text-success m-0";
+        })
+      );
+
+      document.getElementById("tradingForm").addEventListener("submit", (e) => {
         e.preventDefault();
         const btn = document.getElementById("btnSubmit");
-
-        // Validasi URL belum diganti
-        if (scriptURL.includes("PASTE_URL")) {
-          Swal.fire("Error", "URL Script belum dipasang di kode HTML!", "error");
-          return;
-        }
-
         btn.disabled = true;
         btn.innerText = "Menyimpan...";
-
-        fetch(scriptURL, { method: "POST", body: new FormData(form) })
-          .then((response) => {
-            Swal.fire({
-              title: "Berhasil!",
-              text: "Data transaksi tersimpan.",
-              icon: "success",
-              timer: 2000,
-              showConfirmButton: false,
-            });
-            form.reset();
-            document.getElementById("marginDisplay").innerText = "Rp 0"; // Reset margin display
+        fetch(scriptURL, { method: "POST", body: new FormData(document.getElementById("tradingForm")) })
+          .then((r) => {
+            Swal.fire("Sukses", "Data tersimpan", "success");
+            document.getElementById("tradingForm").reset();
             btn.disabled = false;
-            btn.innerText = "Simpan Transaksi";
+            btn.innerText = "Simpan";
           })
-          .catch((error) => {
-            Swal.fire("Error!", "Gagal menyimpan data.", "error");
-            console.error("Error!", error.message);
+          .catch((e) => {
+            Swal.fire("Error", e.message, "error");
             btn.disabled = false;
-            btn.innerText = "Simpan Transaksi";
+            btn.innerText = "Simpan";
           });
       });
+
+      // --- LOGIKA DASHBOARD & CHART ---
+      let allData = []; // Menyimpan data mentah dari spreadsheet
+      let myProfitChart = null;
+      let myItemChart = null;
+
+      function loadDashboardData() {
+        document.getElementById("loading").style.display = "block";
+        // Panggil fungsi getData di Code.gs
+        google.script.run.withSuccessHandler(onDataLoaded).getData();
+      }
+
+      function onDataLoaded(data) {
+        document.getElementById("loading").style.display = "none";
+        allData = data;
+
+        // Set default filter date (bulan ini)
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        document.getElementById("filterStart").valueAsDate = firstDay;
+        document.getElementById("filterEnd").valueAsDate = today;
+
+        applyFilter();
+      }
+
+      function applyFilter() {
+        const start = new Date(document.getElementById("filterStart").value);
+        const end = new Date(document.getElementById("filterEnd").value);
+
+        // Filter Data berdasarkan Tanggal Terjual (atau Beli jika Terjual kosong)
+        const filtered = allData.filter((d) => {
+          if (!d.tanggalTerjual && !d.tanggalBeli) return false;
+          // Gunakan tanggal terjual untuk grafik penjualan, jika kosong pakai tanggal beli
+          const dateStr = d.tanggalTerjual || d.tanggalBeli;
+          const dateObj = new Date(dateStr);
+          return dateObj >= start && dateObj <= end;
+        });
+
+        updateCards(filtered);
+        renderCharts(filtered);
+      }
+
+      function updateCards(data) {
+        let profit = 0;
+        let omzet = 0;
+
+        data.forEach((d) => {
+          profit += d.netMargin || 0;
+          omzet += d.hargaJual || 0;
+        });
+
+        const fmt = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 });
+        document.getElementById("totalProfit").innerText = fmt.format(profit);
+        document.getElementById("totalOmzet").innerText = fmt.format(omzet);
+        document.getElementById("totalItem").innerText = data.length + " Pcs";
+      }
+
+      function renderCharts(data) {
+        // 1. Persiapkan Data Grafik Profit Harian
+        // Grouping by Date
+        const dailyMap = {};
+        data.forEach((d) => {
+          let dateKey = "N/A";
+          if (d.tanggalTerjual) {
+            let dt = new Date(d.tanggalTerjual);
+            dateKey = dt.toLocaleDateString("id-ID"); // Format DD/MM/YYYY
+          }
+          dailyMap[dateKey] = (dailyMap[dateKey] || 0) + (d.netMargin || 0);
+        });
+
+        const labelsDate = Object.keys(dailyMap);
+        const dataProfit = Object.values(dailyMap);
+
+        // 2. Persiapkan Data Top Item (Profit)
+        const itemMap = {};
+        data.forEach((d) => {
+          itemMap[d.item] = (itemMap[d.item] || 0) + (d.netMargin || 0);
+        });
+        // Sortir dan ambil top 5
+        const sortedItems = Object.entries(itemMap)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5);
+        const labelsItem = sortedItems.map((x) => x[0]);
+        const dataItemProfit = sortedItems.map((x) => x[1]);
+
+        // --- RENDER CHART JS ---
+        const ctxProfit = document.getElementById("profitChart").getContext("2d");
+        const ctxItem = document.getElementById("itemChart").getContext("2d");
+
+        if (myProfitChart) myProfitChart.destroy();
+        if (myItemChart) myItemChart.destroy();
+
+        // Chart Profit (Bar)
+        myProfitChart = new Chart(ctxProfit, {
+          type: "bar",
+          data: {
+            labels: labelsDate,
+            datasets: [
+              {
+                label: "Profit (Rp)",
+                data: dataProfit,
+                backgroundColor: "rgba(25, 135, 84, 0.7)",
+                borderColor: "rgba(25, 135, 84, 1)",
+                borderWidth: 1,
+              },
+            ],
+          },
+          options: { responsive: true, maintainAspectRatio: false },
+        });
+
+        // Chart Item (Pie/Doughnut)
+        myItemChart = new Chart(ctxItem, {
+          type: "doughnut",
+          data: {
+            labels: labelsItem,
+            datasets: [
+              {
+                data: dataItemProfit,
+                backgroundColor: ["#0d6efd", "#6610f2", "#6f42c1", "#d63384", "#dc3545"],
+              },
+            ],
+          },
+          options: { responsive: true, maintainAspectRatio: false },
+        });
+      }
     </script>
   </body>
 </html>
