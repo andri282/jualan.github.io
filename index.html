@@ -48,6 +48,17 @@
     </style>
   </head>
   <body>
+    <div id="loginOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #343a40; z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column">
+      <div class="card p-4 text-center" style="width: 300px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5)">
+        <h3 class="mb-3">🔒 Keamanan</h3>
+        <p class="text-muted small">Masukkan PIN untuk akses</p>
+        <div class="mb-3">
+          <input type="password" id="pinInput" class="form-control text-center fs-4" maxlength="6" placeholder="******" onkeypress="handleEnter(event)" />
+        </div>
+        <button class="btn btn-primary w-100" onclick="checkPin()">Buka Aplikasi</button>
+      </div>
+    </div>
+
     <div id="loading" class="loading-overlay">
       <div class="spinner-border text-primary" role="status"></div>
       <p>Memuat Data...</p>
@@ -154,8 +165,40 @@
 
     <script>
       // --- KONFIGURASI ---
-      // GANTI DENGAN URL DEPLOY ANDA
-      const scriptURL = "https://script.google.com/macros/s/AKfycbzrHvS3gYlGYNre63RN5Z2umoQ4_B2h3D_TaRBINkM26qx7qG69hI8awRzlRCEr64HI/exec";
+      const scriptURL = "https://script.google.com/macros/s/AKfycbzrHvS3gYlGYNre63RN5Z2umoQ4_B2h3D_TaRBINkM26qx7qG69hI8awRzlRCEr64HI/exec"; // Pastikan URL benar
+      const APP_PIN = "12321"; // <--- GANTI PIN ANDA DISINI (Bebas angka/huruf)
+
+      // --- LOGIKA LOGIN PIN ---
+      function checkPin() {
+        const input = document.getElementById("pinInput").value;
+        if (input === APP_PIN) {
+          // Jika PIN Benar
+          document.getElementById("loginOverlay").style.display = "none"; // Hilangkan layar kunci
+
+          // Simpan status login di browser (biar tidak tanya PIN terus saat refresh)
+          // sessionStorage.setItem('isLoggedIn', 'true');
+
+          // Baru kita load data dashboard setelah login berhasil
+          loadDashboardData();
+        } else {
+          // Jika PIN Salah
+          Swal.fire("Akses Ditolak", "PIN yang Anda masukkan salah!", "error");
+          document.getElementById("pinInput").value = "";
+        }
+      }
+
+      // Biar bisa tekan ENTER saat ketik PIN
+      function handleEnter(e) {
+        if (e.key === "Enter") checkPin();
+      }
+
+      // Cek apakah user pernah login di sesi ini (Opsional)
+      // window.onload = function() {
+      //   if(sessionStorage.getItem('isLoggedIn') === 'true') {
+      //       document.getElementById('loginOverlay').style.display = 'none';
+      //       loadDashboardData();
+      //   }
+      // }
 
       // --- LOGIKA INPUT (Sama seperti sebelumnya) ---
       const inputs = document.querySelectorAll(".calc-trigger");
@@ -176,6 +219,9 @@
         const btn = document.getElementById("btnSubmit");
         btn.disabled = true;
         btn.innerText = "Menyimpan...";
+
+        // Jika pakai GitHub Pages, gunakan mode no-cors atau proxy jika perlu,
+        // tapi untuk post data biasanya aman.
         fetch(scriptURL, { method: "POST", body: new FormData(document.getElementById("tradingForm")) })
           .then((r) => {
             Swal.fire("Sukses", "Data tersimpan", "success");
@@ -190,38 +236,37 @@
           });
       });
 
-      // --- LOGIKA DASHBOARD & CHART ---
-      let allData = []; // Menyimpan data mentah dari spreadsheet
-      let myProfitChart = null;
-      let myItemChart = null;
+      // --- LOGIKA DASHBOARD ---
+      let allData = [];
 
       function loadDashboardData() {
+        // Cek dulu apakah PIN overlay masih ada? Kalau ada, jangan load data
+        if (document.getElementById("loginOverlay").style.display !== "none") return;
+
         document.getElementById("loading").style.display = "block";
 
-        // Kita ganti google.script.run dengan fetch biasa
-        // Pastikan variabel scriptURL di atas sudah benar berisi URL Google Script App Anda
+        // Ganti dengan fetch untuk GitHub Pages support
         fetch(scriptURL + "?action=getData")
-          .then((response) => response.json())
+          .then((res) => res.json())
           .then((data) => {
             onDataLoaded(data);
           })
-          .catch((error) => {
-            console.error("Error:", error);
+          .catch((err) => {
+            console.error(err);
             document.getElementById("loading").style.display = "none";
-            alert("Gagal mengambil data. Cek Console.");
           });
       }
+
+      // ... (SISA FUNGSI onDataLoaded, applyFilter, updateCards, renderCharts SAMA SEPERTI SEBELUMNYA) ...
+      // Pastikan Anda menyalin fungsi-fungsi chart dari kode sebelumnya ke sini.
 
       function onDataLoaded(data) {
         document.getElementById("loading").style.display = "none";
         allData = data;
-
-        // Set default filter date (bulan ini)
         const today = new Date();
         const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
         document.getElementById("filterStart").valueAsDate = firstDay;
         document.getElementById("filterEnd").valueAsDate = today;
-
         applyFilter();
       }
 
@@ -229,10 +274,8 @@
         const start = new Date(document.getElementById("filterStart").value);
         const end = new Date(document.getElementById("filterEnd").value);
 
-        // Filter Data berdasarkan Tanggal Terjual (atau Beli jika Terjual kosong)
         const filtered = allData.filter((d) => {
           if (!d.tanggalTerjual && !d.tanggalBeli) return false;
-          // Gunakan tanggal terjual untuk grafik penjualan, jika kosong pakai tanggal beli
           const dateStr = d.tanggalTerjual || d.tanggalBeli;
           const dateObj = new Date(dateStr);
           return dateObj >= start && dateObj <= end;
@@ -245,12 +288,10 @@
       function updateCards(data) {
         let profit = 0;
         let omzet = 0;
-
         data.forEach((d) => {
           profit += d.netMargin || 0;
           omzet += d.hargaJual || 0;
         });
-
         const fmt = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 });
         document.getElementById("totalProfit").innerText = fmt.format(profit);
         document.getElementById("totalOmzet").innerText = fmt.format(omzet);
@@ -258,69 +299,48 @@
       }
 
       function renderCharts(data) {
-        // 1. Persiapkan Data Grafik Profit Harian
-        // Grouping by Date
         const dailyMap = {};
+        const itemMap = {};
+
         data.forEach((d) => {
           let dateKey = "N/A";
           if (d.tanggalTerjual) {
             let dt = new Date(d.tanggalTerjual);
-            dateKey = dt.toLocaleDateString("id-ID"); // Format DD/MM/YYYY
+            dateKey = dt.toLocaleDateString("id-ID");
           }
           dailyMap[dateKey] = (dailyMap[dateKey] || 0) + (d.netMargin || 0);
+          itemMap[d.item] = (itemMap[d.item] || 0) + (d.netMargin || 0);
         });
 
         const labelsDate = Object.keys(dailyMap);
         const dataProfit = Object.values(dailyMap);
 
-        // 2. Persiapkan Data Top Item (Profit)
-        const itemMap = {};
-        data.forEach((d) => {
-          itemMap[d.item] = (itemMap[d.item] || 0) + (d.netMargin || 0);
-        });
-        // Sortir dan ambil top 5
         const sortedItems = Object.entries(itemMap)
           .sort((a, b) => b[1] - a[1])
           .slice(0, 5);
         const labelsItem = sortedItems.map((x) => x[0]);
         const dataItemProfit = sortedItems.map((x) => x[1]);
 
-        // --- RENDER CHART JS ---
         const ctxProfit = document.getElementById("profitChart").getContext("2d");
         const ctxItem = document.getElementById("itemChart").getContext("2d");
 
-        if (myProfitChart) myProfitChart.destroy();
-        if (myItemChart) myItemChart.destroy();
+        if (window.myProfitChart instanceof Chart) window.myProfitChart.destroy();
+        if (window.myItemChart instanceof Chart) window.myItemChart.destroy();
 
-        // Chart Profit (Bar)
-        myProfitChart = new Chart(ctxProfit, {
+        window.myProfitChart = new Chart(ctxProfit, {
           type: "bar",
           data: {
             labels: labelsDate,
-            datasets: [
-              {
-                label: "Profit (Rp)",
-                data: dataProfit,
-                backgroundColor: "rgba(25, 135, 84, 0.7)",
-                borderColor: "rgba(25, 135, 84, 1)",
-                borderWidth: 1,
-              },
-            ],
+            datasets: [{ label: "Profit (Rp)", data: dataProfit, backgroundColor: "rgba(25, 135, 84, 0.7)" }],
           },
           options: { responsive: true, maintainAspectRatio: false },
         });
 
-        // Chart Item (Pie/Doughnut)
-        myItemChart = new Chart(ctxItem, {
+        window.myItemChart = new Chart(ctxItem, {
           type: "doughnut",
           data: {
             labels: labelsItem,
-            datasets: [
-              {
-                data: dataItemProfit,
-                backgroundColor: ["#0d6efd", "#6610f2", "#6f42c1", "#d63384", "#dc3545"],
-              },
-            ],
+            datasets: [{ data: dataItemProfit, backgroundColor: ["#0d6efd", "#6610f2", "#6f42c1", "#d63384", "#dc3545"] }],
           },
           options: { responsive: true, maintainAspectRatio: false },
         });
