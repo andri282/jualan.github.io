@@ -172,14 +172,27 @@
       function checkPin() {
         if (document.getElementById("pinInput").value === APP_PIN) {
           document.getElementById("loginOverlay").style.display = "none";
-          loadData(); // Load data saat login berhasil
+
+          // Simpan "tiket masuk" di memori browser
+          sessionStorage.setItem("isLoggedIn", "true");
+
+          loadData();
         } else {
           Swal.fire("Error", "PIN Salah!", "error");
         }
       }
+
       function handleEnter(e) {
         if (e.key === "Enter") checkPin();
       }
+
+      // Cek apakah sudah punya tiket masuk saat halaman dimuat
+      window.addEventListener("DOMContentLoaded", () => {
+        if (sessionStorage.getItem("isLoggedIn") === "true") {
+          document.getElementById("loginOverlay").style.display = "none";
+          loadData();
+        }
+      });
 
       // 2. FUNGSI LOAD DATA (Untuk Dashboard & Riwayat)
       function loadData() {
