@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
   <head>
     <base target="_top" />
@@ -75,8 +75,15 @@
 
     <div class="container pb-5">
       <ul class="nav nav-tabs mb-4" id="myTab">
-        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#input-pane">📝 Input & Riwayat</button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#dashboard-pane" onclick="loadDashboardData()">📊 Dashboard</button></li>
+        <li class="nav-item">
+          <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#input-pane">📝 Input & Riwayat</button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#dashboard-pane" onclick="loadDashboardData()">📊 Dashboard</button>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="inventory.html" style="color: #495057">📦 Gudang Part</a>
+        </li>
       </ul>
 
       <div class="tab-content">
@@ -341,7 +348,7 @@
           const disp = document.getElementById("marginDisplay");
           disp.innerText = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(m);
           disp.className = m < 0 ? "text-danger" : "text-success";
-        })
+        }),
       );
 
       function onDataLoaded(data) {
